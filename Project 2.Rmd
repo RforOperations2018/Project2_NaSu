@@ -24,6 +24,8 @@ require(leaflet)
 require(leaflet.extras)
 require(readxl)
 require(stringr)
+library(jsonlite)
+library(data.table)
 options(scipen = 4)
 ```
 
@@ -49,27 +51,29 @@ ckanUniques <- function(id, field) {
 
 # Get distinct choices for input select
 TYPE_Choice <- sort(ckanUniques("e500cd8b-aa04-4845-a77f-c93b6dfa86b0", "TYPE")$TYPE)
+TYPE_Choice
 DAM_HEIGHT_Choice <- sort(ckanUniques("e500cd8b-aa04-4845-a77f-c93b6dfa86b0", "DAM_HEIGHT")$DAM_HEIGHT)
 DAM_HEIGHT_Choice <- as.numeric(DAM_HEIGHT_Choice)
 DAM_NAME_Choice <- sort(ckanUniques("e500cd8b-aa04-4845-a77f-c93b6dfa86b0", "DAM_NAME")$DAM_NAME)
 
 damInput <- reactive({
-  # Building an IN selector
+  # Building selectors for inputs
   TYPE_filter <- ifelse(length(input$TYPESelect) > 0, 
                           paste0("%20%22TYPE%22%20IN%20(%27", paste(input$TYPESelect, collapse = "%27,%27"),"%27)"),"")
   DAM_HEIGHT_filter <- ifelse(length(input$DAM_HEIGHTSelect) > 0,
                             paste0("%20AND%20%22DAM_HEIGHT%22%20BETWEEN%20%27", paste(input$DAM_HEIGHTSelect, collapse = "%27AND%27"),"%27"),"")
-  ff <- input$DAM_NAMESelect
-  ff <- gsub("'", "''", ff)
-  ff <- gsub("#", "%23", ff)
-  DAM_NAME_filter <- ifelse(length(ff) > 0,
-                          paste0("%20AND%20%22DAM_NAME%22%20IN%20(%27", paste(ff, collapse = "%27,%27"),"%27)"),"")
+  # Since this varible has some values with symbols ' and #, I replace them to readable for sql and connect to API
+  fixed_variableinput <- input$DAM_NAMESelect
+  fixed_variableinput <- gsub("'", "''", fixed_variableinput)
+  fixed_variableinput <- gsub("#", "%23", fixed_variableinput)
+  DAM_NAME_filter <- ifelse(length(fixed_variableinput) > 0,
+                          paste0("%20AND%20%22DAM_NAME%22%20IN%20(%27", paste(fixed_variableinput, collapse = "%27,%27"),"%27)"),"")
   # Build API Query with proper encodes
   url <- paste0("https://data.wprdc.org/api/action/datastore_search_sql?sql=SELECT%20*%20FROM%20%22e500cd8b-aa04-4845-a77f-c93b6dfa86b0%22%20WHERE",
                 TYPE_filter,
-                DAM_HEIGHT_filter,DAM_NAME_filter)
-  # 
-   # Load and clean data
+                DAM_HEIGHT_filter,
+                DAM_NAME_filter)
+  # Load and clean data
   print(url)
   data_get <-  ckanSQL(url) %>%
     mutate(X = as.numeric(X),
@@ -80,17 +84,26 @@ damInput <- reactive({
     
 })
 
+##load shapefile to get the polygons on map
+#Hydrology_Areas.load <- readOGR(dsn = path.expand("./Allegheny_County_Hydrology_Areas"), layer = "Allegheny_County_Hydrology_Areas")
 
-Hydrology_Areas.load <- readOGR(dsn = path.expand("C:/Users/sunas/Desktop/Courses/R shiny/Project2_NaSu/Allegheny_County_Hydrology_Areas"), layer = "Allegheny_County_Hydrology_Areas")
+##Buile interactive data for polygons map
+# url2 <- paste0("https://services1.arcgis.com/vdNDkVykv9vEWFX4/arcgis/rest/services/Hydrology_Areas/FeatureServer/0/query?where=1%3D1&outFields=*&outSR=4326&f=json")
+# print(url2)
+# Hydrology_Areas = rjson::fromJSON(file="https://services1.arcgis.com/vdNDkVykv9vEWFX4/arcgis/rest/services/Hydrology_Areas/FeatureServer/0/query?where=1%3D1&outFields=*&outSR=4326&f=json")
 
+Hydrology_Areas_list <- fromJSON("https://services1.arcgis.com/vdNDkVykv9vEWFX4/arcgis/rest/services/Hydrology_Areas/FeatureServer/0/query?where=1%3D1&outFields=*&outSR=4326&f=json")
+
+head(data.frame(t(sapply(Hydrology_Areas_list,c))))
 
 areas_Input <- reactive({
-  Hydrology_Areas <- Hydrology_Areas.load
+
   if (length(input$FEATURECODSelect) > 0) {
     Hydrology_Areas <- subset(Hydrology_Areas, FEATURECOD %in% input$FEATURECODSelect)
   }
   return(Hydrology_Areas) 
 })
+
 
 
 ```
@@ -105,9 +118,8 @@ Sidebar {.sidebar}
 # checkbox Selection
 checkboxGroupInput("TYPESelect",
                    "Type:",
-                   # label = c("EARTH" = "EARTH", "GRAVITY" = "GRAVITY","OTHER" = "OTHER","" = "UNKNOWN"),
-                   choices = TYPE_Choice,
-                   selected = c("EARTH", "GRAVITY"))
+                   choices = c("EARTH" = "EARTH", "GRAVITY" = "GRAVITY","OTHER" = "OTHER","UNKNOWN" = ""),
+                   selected = c("EARTH", "GRAVITY","OTHER",""))
 # Selectinput Selection
 selectInput("DAM_NAMESelect",
             "Dam:",
@@ -135,9 +147,9 @@ renderPlotly({
       geom_bar() + theme(axis.title.x=element_blank(),
                                axis.text.x=element_blank(),
                                axis.ticks.x=element_blank()) +
-      ggtitle("Distrubution of Award Requested by Grant Type") +
-      xlab("Applicant") +
-      ylab("Award Requested"))
+      ggtitle("Distrubution of Dam Type by Dam") +
+      xlab("Type") +
+      ylab("Count"))
 })
 ```
 
@@ -149,9 +161,9 @@ renderPlotly({
       geom_point() + theme(axis.title.x=element_blank(),
                                axis.text.x=element_blank(),
                                axis.ticks.x=element_blank()) +
-      ggtitle("Distrubution of Award Requested by Grant Type") +
-      xlab("Applicant") +
-      ylab("Award Requested"))
+      ggtitle("Distrubution of Dam Height by Dam") +
+      xlab("Dam") +
+      ylab("Height of Dam"))
 })
 ```
 
@@ -163,7 +175,7 @@ Sidebar {.sidebar}
 # checkbox Selection
 checkboxGroupInput("FEATURECODSelect",
                    "Feature code:",
-                   choices = unique(Hydrology_Areas.load$FEATURECOD),
+                   choices = unique(Hydrology_Areas$FEATURECOD),
                    selected = c("410", "420"))
 ```
 
@@ -191,9 +203,8 @@ renderLeaflet({
 Table
 =====================================
 
-Row 
+Row {.tabset .tabset-fade}
 -------------------------------------
-### Table 
 
 ```{r}
 DT::renderDataTable({
@@ -201,17 +212,17 @@ DT::renderDataTable({
   subset(data_dam, select = c(X, Y, DAM_NAME, TYPE,DAM_HEIGHT,DRAIN_AREA))
 })
 
-downloadHandler(
-  filename = function() {
-    paste("City Wide Revenues and Expenses", Sys.Date(), ".csv", sep="")
-    },
+```
+```{r}
+downloadHandler(filename = function(){ 
+  paste('Dam information in Allegheny County', Sys.Date(), ".csv", sep="")
+  }, 
   content = function(file) {
-    write.csv(damInput(), file)
-    })
-
-downloadButton("data","Download City Wide Revenues and Expenses Data")
+   write.csv(damInput(), file)
+})
 
 ```
+
 
 
 
