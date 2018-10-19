@@ -12,16 +12,12 @@ output:
 library(flexdashboard)
 library(shiny)
 library(reshape2)
-library(dplyr)
 library(plotly)
 library(shinythemes)
-library(stringr)
 library(ggplot2)
 library(plyr)
-library(shiny)
 library(httr)
 library(jsonlite)
-library(plotly)
 library(dplyr)
 require(rgdal)
 require(leaflet)
@@ -51,35 +47,27 @@ ckanUniques <- function(id, field) {
   c(ckanSQL(url))
 }
 
-ckanColumn <- function(id, field) {
-  url <- paste0("https://data.wprdc.org/api/action/datastore_search_sql?sql=SELECT%20%22", field, "%22%20from%20%22", id, "%22")
-  c(ckanSQL(URLencode(url)))
-}
-
-# Get distinct Request Types
+# Get distinct choices for input select
 TYPE_Choice <- sort(ckanUniques("e500cd8b-aa04-4845-a77f-c93b6dfa86b0", "TYPE")$TYPE)
 DAM_HEIGHT_Choice <- sort(ckanUniques("e500cd8b-aa04-4845-a77f-c93b6dfa86b0", "DAM_HEIGHT")$DAM_HEIGHT)
-DAM_HEIGHT_Choice = as.numeric(DAM_HEIGHT_Choice)
+DAM_HEIGHT_Choice <- as.numeric(DAM_HEIGHT_Choice)
+DAM_NAME_Choice <- sort(ckanUniques("e500cd8b-aa04-4845-a77f-c93b6dfa86b0", "DAM_NAME")$DAM_NAME)
 
-
-# SHAPE_area_column <- as.numeric(sort(ckanColumn("9204927d-550d-46ff-8ca8-5dcb5bb8e5cf", "SHAPE_area")$SHAPE_area))
-# SHAPE_len_column <- as.numeric(sort(ckanColumn("9204927d-550d-46ff-8ca8-5dcb5bb8e5cf", "SHAPE_len")$SHAPE_len))
-# FEATURECOD_column <- sort(ckanColumn("9204927d-550d-46ff-8ca8-5dcb5bb8e5cf", "FEATURECOD")$FEATURECOD)
-# polygondata <- data.frame(SHAPE_area_column,SHAPE_len_column,FEATURECOD_column) 
-# 
-# table(FEATURECOD_column)
-
-
-iaInput <- reactive({
+damInput <- reactive({
   # Building an IN selector
   TYPE_filter <- ifelse(length(input$TYPESelect) > 0, 
-                          paste0("%20%22TYPE%22%20IN%20(%27", paste(input$TYPESelect, collapse = "%27,%27"),"%27)"),
-                          "")
+                          paste0("%20%22TYPE%22%20IN%20(%27", paste(input$TYPESelect, collapse = "%27,%27"),"%27)"),"")
   DAM_HEIGHT_filter <- ifelse(length(input$DAM_HEIGHTSelect) > 0,
-                            paste0("%20AND%20%22DAM_HEIGHT%22%20BETWEEN%20%27", paste(input$DAM_HEIGHTSelect, collapse = "%27AND%27"),"%27"),
-                            "")
+                            paste0("%20AND%20%22DAM_HEIGHT%22%20BETWEEN%20%27", paste(input$DAM_HEIGHTSelect, collapse = "%27AND%27"),"%27"),"")
+  ff <- input$DAM_NAMESelect
+  ff <- gsub("'", "''", ff)
+  ff <- gsub("#", "%23", ff)
+  DAM_NAME_filter <- ifelse(length(ff) > 0,
+                          paste0("%20AND%20%22DAM_NAME%22%20IN%20(%27", paste(ff, collapse = "%27,%27"),"%27)"),"")
   # Build API Query with proper encodes
-  url <- paste0("https://data.wprdc.org/api/action/datastore_search_sql?sql=SELECT%20*%20FROM%20%22e500cd8b-aa04-4845-a77f-c93b6dfa86b0%22%20WHERE",TYPE_filter,DAM_HEIGHT_filter)
+  url <- paste0("https://data.wprdc.org/api/action/datastore_search_sql?sql=SELECT%20*%20FROM%20%22e500cd8b-aa04-4845-a77f-c93b6dfa86b0%22%20WHERE",
+                TYPE_filter,
+                DAM_HEIGHT_filter,DAM_NAME_filter)
   # 
    # Load and clean data
   print(url)
@@ -88,16 +76,14 @@ iaInput <- reactive({
            Y = as.numeric(Y),
            DAM_HEIGHT = as.numeric(DAM_HEIGHT),
            TYPE = mapvalues(TYPE,c(""),c("UNKNOWN")))
-  
   return(data_get) 
     
 })
 
 
-# class(Hydrology_Areas.load$SHAPE_area)
-# class(Hydrology_Areas.load$SHAPE_len)
-
 Hydrology_Areas.load <- readOGR(dsn = path.expand("C:/Users/sunas/Desktop/Courses/R shiny/Project2_NaSu/Allegheny_County_Hydrology_Areas"), layer = "Allegheny_County_Hydrology_Areas")
+
+
 areas_Input <- reactive({
   Hydrology_Areas <- Hydrology_Areas.load
   if (length(input$FEATURECODSelect) > 0) {
@@ -116,32 +102,25 @@ Sidebar {.sidebar}
 -------------------------------------
 
 ```{r}
-# State select Selection
-# selectInput("TYPESelect",
-#             "Type:",
-#             choices = TYPE_Choice,
-#             multiple = TRUE,
-#             selectize = TRUE,
-#             selected = c("EARTH"))
-# # Grant Type select Selection
-# selectInput("GrantTypeSelect",
-#             "GrantType:",
-#             choices = sort(unique(data.load$Grant.Type)),
-#             multiple = TRUE,
-#             selectize = TRUE,
-#             selected = c("Development"))
 # checkbox Selection
 checkboxGroupInput("TYPESelect",
                    "Type:",
-                   #label = c("EARTH" = "EARTH", "GRAVITY" = "GRAVITY","OTHER" = "OTHER","" = "UNKNOWN"),
+                   # label = c("EARTH" = "EARTH", "GRAVITY" = "GRAVITY","OTHER" = "OTHER","" = "UNKNOWN"),
                    choices = TYPE_Choice,
-                   selected = c("EARTH", "GRAVITY","OTHER",""))
-# Siderbar Selection
-# sliderInput("DAM_HEIGHTSelect",
-#             "Dam Height:",
-#             min = min(DAM_HEIGHT_Choice, na.rm = T),
-#             max = max(DAM_HEIGHT_Choice, na.rm = T),
-#             value = c(min(DAM_HEIGHT_Choice, na.rm = T), max(DAM_HEIGHT_Choice, na.rm = T)), step = 1)
+                   selected = c("EARTH", "GRAVITY"))
+# Selectinput Selection
+selectInput("DAM_NAMESelect",
+            "Dam:",
+            choices = DAM_NAME_Choice,
+            multiple = TRUE,
+            selectize = TRUE,
+            selected = c("PINE CREEK","UPPER DAM","GLADE LAKE","BALD KNOB","LaROCHE COLLEGE DETENTION BASIN"))
+#Siderbar Selection
+sliderInput("DAM_HEIGHTSelect",
+            "Dam Height:",
+            min = min(DAM_HEIGHT_Choice, na.rm = T),
+            max = max(DAM_HEIGHT_Choice, na.rm = T),
+            value = c(min(DAM_HEIGHT_Choice, na.rm = T), max(DAM_HEIGHT_Choice, na.rm = T)), step = 1)
 ```
 
 Row {.tabset .tabset-fade}
@@ -150,10 +129,24 @@ Row {.tabset .tabset-fade}
 
 ```{r}
 renderPlotly({
-  data <- iaInput()
+  data_dam <- damInput()
   ggplotly(
-    ggplot(data= data, aes(x = TYPE)) +
+    ggplot(data= data_dam, aes(x = TYPE, fill = DAM_NAME)) +
       geom_bar() + theme(axis.title.x=element_blank(),
+                               axis.text.x=element_blank(),
+                               axis.ticks.x=element_blank()) +
+      ggtitle("Distrubution of Award Requested by Grant Type") +
+      xlab("Applicant") +
+      ylab("Award Requested"))
+})
+```
+
+```{r}
+renderPlotly({
+  data_dam <- damInput()
+  ggplotly(
+    ggplot(data= data_dam, aes(x = DAM_NAME, y = DAM_HEIGHT)) +
+      geom_point() + theme(axis.title.x=element_blank(),
                                axis.text.x=element_blank(),
                                axis.ticks.x=element_blank()) +
       ggtitle("Distrubution of Award Requested by Grant Type") +
@@ -170,10 +163,8 @@ Sidebar {.sidebar}
 # checkbox Selection
 checkboxGroupInput("FEATURECODSelect",
                    "Feature code:",
-                   #label = c("EARTH" = "EARTH", "GRAVITY" = "GRAVITY","OTHER" = "OTHER","" = "UNKNOWN"),
                    choices = unique(Hydrology_Areas.load$FEATURECOD),
                    selected = c("410", "420"))
-
 ```
 
 Row {.tabset .tabset-fade}
@@ -181,55 +172,21 @@ Row {.tabset .tabset-fade}
 
 ```{r}
 pal311 <- colorFactor(c("#386cb0","#f0027f","#bf5b17","#666666"), c("EARTH", "GRAVITY","OTHER","UNKNOWN"))
-# pal22 <- colorFactor(c("#ffffd9","#edf8b1","#c7e9b4","#7fcdbb","#41b6c4","#1d91c0","#225ea8","#253494","#081d58","#bcbddc","#6a51a3","#7a0177","#fc4e2a","#800026"),c("0","1510", "410", "420", "430","440", "460", "470","500","510","520","530","540","580","590"))
 pal23 <- colorFactor(c("#800026","#fc4e2a","#33a02c","#b15928","#ff7f00","#6a3d9a","#ffed6f","#253494"),c("0","410", "420", "430", "450","460", "470", "520"))
 renderLeaflet({
-  data <- iaInput()
+  data_dam <- damInput()
   Hydrology_Areas <- areas_Input()
-  # Hydrology_lines <- readOGR(dsn = path.expand("./Allegheny_County_Hydrology_Lines"), layer = "Allegheny_County_Hydrology_Lines")
   leaflet() %>%
-    addProviderTiles("OpenStreetMap.HOT") %>%
     addProviderTiles("OpenStreetMap.HOT") %>%
     addPolygons(data = Hydrology_Areas, color = ~pal23(FEATURECOD))%>%
     addLegend(data = Hydrology_Areas,position = "bottomright", pal = pal23, values = ~FEATURECOD)%>%
-    addCircleMarkers(data = data, lng = ~X, lat = ~Y, radius = 5, color = ~pal311(TYPE)) %>%
-    addLegend(data = data, position = "topright" , pal = pal311, values = data$TYPE, title = "TYPE")
-    # addLegend(position = "topright", pal = pal22, values = ~FEATURECOD_column)
-    # addCircleMarkers(data = data, lng = ~X, lat = ~Y, radius = 1.5, color = ~pal311(TYPE))
-    # addLegend(position = "topright" , pal = pal311, values = data$TYPE, title = "TYPE")
+    addCircleMarkers(data = data_dam, lng = ~X, lat = ~Y, radius = 5, color = ~pal311(data_dam$TYPE)) %>%
+    addLegend(data = data_dam, position = "topright" , pal = pal311, values = data_dam$TYPE, title = "TYPE")
 })
 
-# polygondata <- data.frame(SHAPE_area_column,SHAPE_len_column,FEATURECOD_column) 
 ```
 
 
-
-```{r}
-# renderPlotly({
-#     data <- iaInput()
-#     ggplotly(
-#       ggplot(data= data, aes(x = Award.Length, fill = Grant.Type)) + 
-#         geom_bar() + 
-#         ggtitle("Distribution of Award Length by Grant Type") +
-#         xlab("Award Length") +
-#         ylab("Count"))
-# })
-```
-
-Plot 3
-=====================================
-
-```{r}
-# renderPlotly({
-#     data <- iaInput() 
-#     ggplotly(
-#       ggplot(data= data, aes(x = Award.Requested, fill = State)) + 
-#         geom_histogram() +   
-#         ggtitle("Distribution of Award Requested by States") +
-#         xlab("Award Requested") +
-#         ylab("Count")) 
-# })
-```
 
 Table
 =====================================
@@ -240,8 +197,8 @@ Row
 
 ```{r}
 DT::renderDataTable({
-  data <- iaInput()
-  subset(data, select = c(X, Y, DAM_NAME, TYPE,DAM_HEIGHT,DRAIN_AREA))
+  data_dam <- damInput()
+  subset(data_dam, select = c(X, Y, DAM_NAME, TYPE,DAM_HEIGHT,DRAIN_AREA))
 })
 
 downloadHandler(
@@ -249,7 +206,7 @@ downloadHandler(
     paste("City Wide Revenues and Expenses", Sys.Date(), ".csv", sep="")
     },
   content = function(file) {
-    write.csv(iaInput(), file)
+    write.csv(damInput(), file)
     })
 
 downloadButton("data","Download City Wide Revenues and Expenses Data")
