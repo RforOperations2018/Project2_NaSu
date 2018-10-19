@@ -1,5 +1,5 @@
 ---
-title: "Project2"
+title: "Project2- Na Su"
 runtime: shiny
 output: 
   flexdashboard::flex_dashboard:
@@ -17,7 +17,6 @@ library(shinythemes)
 library(ggplot2)
 library(plyr)
 library(httr)
-library(jsonlite)
 library(dplyr)
 require(rgdal)
 require(leaflet)
@@ -25,7 +24,6 @@ require(leaflet.extras)
 require(readxl)
 require(stringr)
 library(jsonlite)
-library(data.table)
 options(scipen = 4)
 ```
 
@@ -44,6 +42,7 @@ ckanSQL <- function(url) {
   # Create Dataframe
   data.frame(jsonlite::fromJSON(json)$result$records)
 }
+
 ckanUniques <- function(id, field) {
   url <- paste0("https://data.wprdc.org/api/action/datastore_search_sql?sql=SELECT%20DISTINCT(%22", field, "%22)%20from%20%22", id, "%22")
   c(ckanSQL(url))
@@ -69,10 +68,7 @@ damInput <- reactive({
   DAM_NAME_filter <- ifelse(length(fixed_variableinput) > 0,
                           paste0("%20AND%20%22DAM_NAME%22%20IN%20(%27", paste(fixed_variableinput, collapse = "%27,%27"),"%27)"),"")
   # Build API Query with proper encodes
-  url <- paste0("https://data.wprdc.org/api/action/datastore_search_sql?sql=SELECT%20*%20FROM%20%22e500cd8b-aa04-4845-a77f-c93b6dfa86b0%22%20WHERE",
-                TYPE_filter,
-                DAM_HEIGHT_filter,
-                DAM_NAME_filter)
+  url <- paste0("https://data.wprdc.org/api/action/datastore_search_sql?sql=SELECT%20*%20FROM%20%22e500cd8b-aa04-4845-a77f-c93b6dfa86b0%22%20WHERE", TYPE_filter, DAM_HEIGHT_filter, DAM_NAME_filter)
   # Load and clean data
   print(url)
   data_get <-  ckanSQL(url) %>%
@@ -85,27 +81,16 @@ damInput <- reactive({
 })
 
 ##load shapefile to get the polygons on map
-#Hydrology_Areas.load <- readOGR(dsn = path.expand("./Allegheny_County_Hydrology_Areas"), layer = "Allegheny_County_Hydrology_Areas")
+
+Hydrology_Areas <- readOGR('./Allegheny_County_Hydrology_Areas.geojson')
 
 ##Buile interactive data for polygons map
-# url2 <- paste0("https://services1.arcgis.com/vdNDkVykv9vEWFX4/arcgis/rest/services/Hydrology_Areas/FeatureServer/0/query?where=1%3D1&outFields=*&outSR=4326&f=json")
-# print(url2)
-# Hydrology_Areas = rjson::fromJSON(file="https://services1.arcgis.com/vdNDkVykv9vEWFX4/arcgis/rest/services/Hydrology_Areas/FeatureServer/0/query?where=1%3D1&outFields=*&outSR=4326&f=json")
-
-Hydrology_Areas_list <- fromJSON("https://services1.arcgis.com/vdNDkVykv9vEWFX4/arcgis/rest/services/Hydrology_Areas/FeatureServer/0/query?where=1%3D1&outFields=*&outSR=4326&f=json")
-
-head(data.frame(t(sapply(Hydrology_Areas_list,c))))
-
 areas_Input <- reactive({
-
   if (length(input$FEATURECODSelect) > 0) {
     Hydrology_Areas <- subset(Hydrology_Areas, FEATURECOD %in% input$FEATURECODSelect)
   }
   return(Hydrology_Areas) 
 })
-
-
-
 ```
 
 Graphs
@@ -195,10 +180,7 @@ renderLeaflet({
     addCircleMarkers(data = data_dam, lng = ~X, lat = ~Y, radius = 5, color = ~pal311(data_dam$TYPE)) %>%
     addLegend(data = data_dam, position = "topright" , pal = pal311, values = data_dam$TYPE, title = "TYPE")
 })
-
 ```
-
-
 
 Table
 =====================================
@@ -213,6 +195,7 @@ DT::renderDataTable({
 })
 
 ```
+
 ```{r}
 downloadHandler(filename = function(){ 
   paste('Dam information in Allegheny County', Sys.Date(), ".csv", sep="")
@@ -220,7 +203,6 @@ downloadHandler(filename = function(){
   content = function(file) {
    write.csv(damInput(), file)
 })
-
 ```
 
 
