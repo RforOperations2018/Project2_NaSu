@@ -5,8 +5,8 @@ account: blingblingapps
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 525181
-bundleId: 1651849
+bundleId: 1652096
 url: https://blingblingapps.shinyapps.io/project_2-nasu/
-when: 1539971979.65538
+when: 1539979718.91102
 asMultiple: FALSE
 asStatic: FALSE

@@ -54,6 +54,9 @@ TYPE_Choice
 DAM_HEIGHT_Choice <- sort(ckanUniques("e500cd8b-aa04-4845-a77f-c93b6dfa86b0", "DAM_HEIGHT")$DAM_HEIGHT)
 DAM_HEIGHT_Choice <- as.numeric(DAM_HEIGHT_Choice)
 DAM_NAME_Choice <- sort(ckanUniques("e500cd8b-aa04-4845-a77f-c93b6dfa86b0", "DAM_NAME")$DAM_NAME)
+FEATURECOD_choice <- fromJSON("https://services1.arcgis.com/vdNDkVykv9vEWFX4/arcgis/rest/services/Hydrology_Areas/FeatureServer/0/query?where=1%3D1&outFields=FEATURECOD&outSR=4326&f=json")
+
+
 
 damInput <- reactive({
   # Building selectors for inputs
@@ -80,17 +83,18 @@ damInput <- reactive({
     
 })
 
-##load shapefile to get the polygons on map
 
-Hydrology_Areas <- readOGR('./Allegheny_County_Hydrology_Areas.geojson')
+##Connect to Gjson API and Buile interactive data for polygons map
 
-##Buile interactive data for polygons map
 areas_Input <- reactive({
-  if (length(input$FEATURECODSelect) > 0) {
-    Hydrology_Areas <- subset(Hydrology_Areas, FEATURECOD %in% input$FEATURECODSelect)
-  }
+  FEATURECOD_filter <- ifelse(length(input$FEATURECODSelect) > 0, 
+                          paste0("%20IN%20(%27", paste(input$FEATURECODSelect, collapse = "%27,%27"),"%27)"))
+  url2 <- paste0('https://services1.arcgis.com/vdNDkVykv9vEWFX4/arcgis/rest/services/Hydrology_Areas/FeatureServer/0/query?where=FEATURECOD',FEATURECOD_filter,'&outFields=FEATURECOD,SHAPE_area,UPDATE_YEA,SHAPE_len,FID&outSR=4326&f=json')
+  print(url2)
+  Hydrology_Areas <- readOGR(url2)
   return(Hydrology_Areas) 
 })
+
 ```
 
 Graphs
@@ -160,7 +164,7 @@ Sidebar {.sidebar}
 # checkbox Selection
 checkboxGroupInput("FEATURECODSelect",
                    "Feature code:",
-                   choices = unique(Hydrology_Areas$FEATURECOD),
+                   choices = unique(FEATURECOD_choice$features$attributes$FEATURECOD),
                    selected = c("410", "420"))
 ```
 
@@ -169,16 +173,16 @@ Row {.tabset .tabset-fade}
 
 ```{r}
 pal311 <- colorFactor(c("#386cb0","#f0027f","#bf5b17","#666666"), c("EARTH", "GRAVITY","OTHER","UNKNOWN"))
-pal23 <- colorFactor(c("#800026","#fc4e2a","#33a02c","#b15928","#ff7f00","#6a3d9a","#ffed6f","#253494"),c("0","410", "420", "430", "450","460", "470", "520"))
+pal23 <- colorFactor(c("#800026","#fc4e2a","#33a02c","#b15928","#ff7f00","#6a3d9a","#ffed6f","#253494"),c("430","420", "470", "450", "520","460", "410", "0"))
 renderLeaflet({
   data_dam <- damInput()
-  Hydrology_Areas <- areas_Input()
+  Hydrology_Areas_data <- areas_Input()
   leaflet() %>%
     addProviderTiles("OpenStreetMap.HOT") %>%
-    addPolygons(data = Hydrology_Areas, color = ~pal23(FEATURECOD))%>%
-    addLegend(data = Hydrology_Areas,position = "bottomright", pal = pal23, values = ~FEATURECOD)%>%
+    addPolygons(data = Hydrology_Areas_data, color = ~pal23(Hydrology_Areas_data$FEATURECOD)) %>%
+    addLegend(data = Hydrology_Areas_data,position = "bottomright", pal = pal23, values = Hydrology_Areas_data$FEATURECOD,title = "Feature Code")%>%
     addCircleMarkers(data = data_dam, lng = ~X, lat = ~Y, radius = 5, color = ~pal311(data_dam$TYPE)) %>%
-    addLegend(data = data_dam, position = "topright" , pal = pal311, values = data_dam$TYPE, title = "TYPE")
+    addLegend(data = data_dam, position = "topright" , pal = pal311, values = data_dam$TYPE, title = "Type")
 })
 ```
 
