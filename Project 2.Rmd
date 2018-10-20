@@ -177,12 +177,13 @@ pal23 <- colorFactor(c("#800026","#fc4e2a","#33a02c","#b15928","#ff7f00","#6a3d9
 renderLeaflet({
   data_dam <- damInput()
   Hydrology_Areas_data <- areas_Input()
+  # Popups would be one way to help users understand exactly what they're using
   leaflet() %>%
     addProviderTiles("OpenStreetMap.HOT") %>%
     addPolygons(data = Hydrology_Areas_data, color = ~pal23(Hydrology_Areas_data$FEATURECOD)) %>%
     addLegend(data = Hydrology_Areas_data,position = "bottomright", pal = pal23, values = Hydrology_Areas_data$FEATURECOD,title = "Feature Code")%>%
     addCircleMarkers(data = data_dam, lng = ~X, lat = ~Y, radius = 5, color = ~pal311(data_dam$TYPE)) %>%
-    addLegend(data = data_dam, position = "topright" , pal = pal311, values = data_dam$TYPE, title = "Type")
+    addLegend(data = data_dam, position = "topright" , pal = pal311, values = data_dam$TYPE, title = "Type") # Example of ui deduction: Just saying type isn't really clear for users.
 })
 ```
 
